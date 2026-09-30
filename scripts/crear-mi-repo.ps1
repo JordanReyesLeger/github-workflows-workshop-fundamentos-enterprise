@@ -3,66 +3,84 @@
     Crea TU copia del taller dentro de tu organizacion y sube el codigo.
 
 .DESCRIPTION
-    Funciona tambien con cuentas Enterprise Managed User (EMU), que no pueden
-    usar "Use this template" contra repositorios de fuera de la empresa.
-
-    Descarga el contenido sin usar tus credenciales, crea un repositorio nuevo
-    en tu organizacion y lo sube. No deja historia ajena: empieza limpio.
+    Funciona con Windows PowerShell 5.1 y con PowerShell 7, y tambien con
+    cuentas Enterprise Managed User (EMU), que no pueden usar
+    "Use this template" contra repositorios de fuera de la empresa.
 
 .EXAMPLE
-    pwsh scripts/crear-mi-repo.ps1 -Organizacion tspjrldemo -Nombre taller-workflows-jordan
+    powershell -ExecutionPolicy Bypass -File .\crear-mi-repo.ps1 -Organizacion mi-org -Nombre taller-workflows-ana
 #>
-[CmdletBinding()]
 param(
-    [Parameter(Mandatory)][string]$Organizacion,
-    [Parameter(Mandatory)][string]$Nombre,
-    [ValidateSet('private','internal')][string]$Visibilidad = 'private',
+    [Parameter(Mandatory = $true)][string]$Organizacion,
+    [Parameter(Mandatory = $true)][string]$Nombre,
+    [ValidateSet('private', 'internal')][string]$Visibilidad = 'private',
     [string]$Origen = 'JordanReyesLeger/github-workflows-workshop-fundamentos-enterprise',
     [string]$Rama = 'main'
 )
 
-$ErrorActionPreference = 'Stop'
+# Sin 'Stop' global: en PowerShell 5.1 convierte la salida normal de gh y git en errores.
+$ErrorActionPreference = 'Continue'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-function Paso($n, $t) { Write-Host "`n[$n] $t" -ForegroundColor Cyan }
+function Paso($n, $t) { Write-Host ""; Write-Host "[$n] $t" -ForegroundColor Cyan }
+function Fallo($t)    { Write-Host ""; Write-Host "ERROR: $t" -ForegroundColor Red; exit 1 }
 
+Paso 0 "Comprobando herramientas y sesion..."
 foreach ($cmd in 'git', 'gh') {
-    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
-        throw "Falta $cmd. Instalalo antes de continuar."
-    }
+    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) { Fallo "Falta '$cmd'. Instalalo y abre una terminal nueva." }
 }
 
-gh auth status *> $null
-if ($LASTEXITCODE -ne 0) { throw "No has iniciado sesion. Ejecuta: gh auth login" }
+$usuario = (gh api user --jq .login 2>$null)
+if ($LASTEXITCODE -ne 0 -or -not $usuario) { Fallo "No has iniciado sesion en GitHub CLI. Ejecuta: gh auth login" }
+Write-Host "    Sesion de GitHub: $usuario"
 
-$destino = Join-Path (Get-Location) $Nombre
-if (Test-Path $destino) { throw "Ya existe la carpeta '$Nombre'. Borrala o usa otro nombre." }
+$null = (gh repo view "$Organizacion/$Nombre" --json name 2>$null)
+if ($LASTEXITCODE -eq 0) {
+    Fallo "El repositorio $Organizacion/$Nombre YA EXISTE. Usa otro nombre, o si es tuyo, clonalo con: gh repo clone $Organizacion/$Nombre"
+}
+
+$destino = Join-Path (Get-Location).Path $Nombre
+if (Test-Path $destino) { Fallo "Ya existe la carpeta '$destino'. Borrala o usa otro nombre." }
 
 Paso 1 "Descargando el contenido del taller..."
-$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("taller-" + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Force $tmp | Out-Null
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ("taller-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 $zip = Join-Path $tmp 'taller.zip'
-
-# Sin credenciales: evita que un token EMU intervenga en la descarga.
-Invoke-WebRequest -Uri "https://codeload.github.com/$Origen/zip/refs/heads/$Rama" -OutFile $zip -UseBasicParsing
-Expand-Archive $zip -DestinationPath $tmp -Force
-$extraido = Get-ChildItem $tmp -Directory | Select-Object -First 1
-Move-Item $extraido.FullName $destino
-Remove-Item -Recurse -Force $tmp
+try {
+    # Sin credenciales: la descarga es anonima, asi una cuenta EMU no interviene.
+    Invoke-WebRequest -Uri "https://codeload.github.com/$Origen/zip/refs/heads/$Rama" -OutFile $zip -UseBasicParsing -ErrorAction Stop
+    Expand-Archive -Path $zip -DestinationPath $tmp -Force -ErrorAction Stop
+} catch {
+    Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+    Fallo "No se pudo descargar el taller: $($_.Exception.Message)"
+}
+$extraido = Get-ChildItem -Path $tmp -Directory | Select-Object -First 1
+Move-Item -Path $extraido.FullName -Destination $destino
+Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 
 Paso 2 "Preparando el repositorio local..."
 Push-Location $destino
-try {
-    git init -q -b $Rama
-    git add -A
-    git commit -q -m "chore: taller de GitHub Actions"
+git init -q -b $Rama
+git add -A
+# Si git no tiene nombre y correo configurados, usa los de tu cuenta de GitHub.
+$identidad = @()
+if (-not (git config user.email)) { $identidad += @('-c', "user.email=$usuario@users.noreply.github.com") }
+if (-not (git config user.name))  { $identidad += @('-c', "user.name=$usuario") }
+git @identidad commit -q -m "chore: taller de GitHub Actions"
+if ($LASTEXITCODE -ne 0) { Pop-Location; Fallo "No se pudo crear el commit inicial." }
 
-    Paso 3 "Creando $Organizacion/$Nombre y subiendo..."
-    gh repo create "$Organizacion/$Nombre" "--$Visibilidad" --source=. --push
-    if ($LASTEXITCODE -ne 0) { throw "No se pudo crear el repositorio. Revisa que puedas crear repos en '$Organizacion'." }
-
-    Write-Host "`nListo." -ForegroundColor Green
-    Write-Host "  Repositorio : https://github.com/$Organizacion/$Nombre"
-    Write-Host "  Carpeta     : $destino"
-    Write-Host "`nSigue con el Modulo 1 del README.`n"
+Paso 3 "Creando $Organizacion/$Nombre ($Visibilidad) y subiendo el codigo..."
+gh repo create "$Organizacion/$Nombre" "--$Visibilidad" --source=. --push
+if ($LASTEXITCODE -ne 0) {
+    Pop-Location
+    Fallo "No se pudo crear el repositorio. Comprueba que puedes crear repos en '$Organizacion'."
 }
-finally { Pop-Location }
+Pop-Location
+
+Write-Host ""
+Write-Host "LISTO" -ForegroundColor Green
+Write-Host "  Repositorio : https://github.com/$Organizacion/$Nombre"
+Write-Host "  Carpeta     : $destino"
+Write-Host ""
+Write-Host "Siguiente paso:  cd $Nombre   y continua con el Modulo 1 del README."
+Write-Host ""

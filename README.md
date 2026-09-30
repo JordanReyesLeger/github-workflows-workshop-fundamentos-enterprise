@@ -182,48 +182,72 @@ gh api user/orgs --jq '.[].login'     # debes ver tu organización
 
 ### 3 · Crea tu copia del taller
 
-Elige **una** de las dos formas. Las dos funcionan con cuentas normales y con
-**Enterprise Managed Users (EMU)**.
+> [!IMPORTANT]
+> **Primero identifica tu terminal** y sigue **solo** su bloque. No mezcles
+> comandos de una y otra.
+>
+> | Si ves esto al inicio de la línea… | Usas… | Sigue el bloque |
+> |---|---|---|
+> | `PS C:\Users\...>` | 🪟 **PowerShell** (Windows) | **🅰️ Windows** |
+> | `usuario@equipo:~$` o `%` | 🐧🍎 **bash / zsh** (Linux o macOS) | **🅰️ Linux / macOS** |
 
-<details open>
-<summary><b>🅰️ Con el script (la más simple, y siempre funciona)</b></summary>
+Hay dos formas de crear tu copia y las dos funcionan con cuentas normales y con
+**Enterprise Managed Users (EMU)**. La 🅰️ funciona siempre.
 
-Descarga el contenido, crea el repositorio en tu organización y lo sube. Un solo
-comando:
+#### 🅰️ Con el script, en 🪟 Windows (PowerShell)
+
+Copia y pega **estas dos líneas** en PowerShell, cambiando `MI-ORG` y
+`TU-USUARIO`. No hace falta clonar nada antes:
 
 ```powershell
-# Windows
-pwsh scripts/crear-mi-repo.ps1 -Organizacion MI-ORG -Nombre taller-workflows-TU-USUARIO
+Invoke-WebRequest -UseBasicParsing -OutFile crear-mi-repo.ps1 -Uri https://raw.githubusercontent.com/JordanReyesLeger/github-workflows-workshop-fundamentos-enterprise/main/scripts/crear-mi-repo.ps1
+
+powershell -ExecutionPolicy Bypass -File .\crear-mi-repo.ps1 -Organizacion MI-ORG -Nombre taller-workflows-TU-USUARIO
 ```
 
-```bash
-# Linux y macOS
-bash scripts/crear-mi-repo.sh MI-ORG taller-workflows-TU-USUARIO
+Ejemplo real: `... -Organizacion contoso -Nombre taller-workflows-ana`
+
+Si todo sale bien verás `LISTO` en verde. Entra en la carpeta y listo:
+
+```powershell
+cd taller-workflows-TU-USUARIO
 ```
 
-¿No tienes el repositorio en local todavía? Descarga solo el script:
+> [!WARNING]
+> **Errores típicos en PowerShell**
+>
+> | Lo que hiciste | Por qué falla | Qué hacer |
+> |---|---|---|
+> | `bash crear-mi-repo.sh ...` | En Windows, `bash` abre **WSL** (otra máquina Linux, con otra sesión de `gh`) o no existe | Usa el script **`.ps1`** con `powershell` |
+> | `curl -fsSL ...` | En PowerShell, `curl` no es el curl de Linux | Usa `Invoke-WebRequest`, tal cual arriba |
+> | Una URL con **`/blob/`** (`github.com/.../blob/main/...`) | Descarga la **página web** en HTML, no el script | Usa la URL **`raw.githubusercontent.com`** de arriba |
+> | `.\crear-mi-repo.ps1` a secas | La política de ejecución de Windows puede bloquearlo | Ejecútalo con `powershell -ExecutionPolicy Bypass -File` |
+> | `YA EXISTE` | Ese repositorio ya está en tu organización | Elige otro `-Nombre`, o clónalo con `gh repo clone` si es tuyo |
+
+#### 🅰️ Con el script, en 🐧🍎 Linux / macOS (bash)
 
 ```bash
-curl -fsSL -o crear-mi-repo.sh \
-  https://raw.githubusercontent.com/PROPIETARIO/github-workflows-workshop-fundamentos-enterprise/main/scripts/crear-mi-repo.sh
+curl -fsSL -o crear-mi-repo.sh https://raw.githubusercontent.com/JordanReyesLeger/github-workflows-workshop-fundamentos-enterprise/main/scripts/crear-mi-repo.sh
+
 bash crear-mi-repo.sh MI-ORG taller-workflows-TU-USUARIO
+
+cd taller-workflows-TU-USUARIO
 ```
 
-Agrega `internal` al final si tu organización lo prefiere sobre `private`.
+Necesita `curl` y `unzip`, que ya vienen en casi todas las distribuciones.
 
-</details>
+> [!TIP]
+> ¿Tu organización prefiere repositorios **internos**? Agrega
+> `-Visibilidad internal` en PowerShell, o `internal` al final en bash.
 
 <details>
-<summary><b>🅱️ Con «Use this template» (si la plantilla ya está en tu empresa)</b></summary>
+<summary><b>🅱️ Con «Use this template» (solo si quien imparte dejó la plantilla en tu organización)</b></summary>
 
 Si quien imparte el taller ya dejó una copia de la plantilla **dentro de tu
-organización**, tienes la vía corta:
+organización**, este comando sirve igual en PowerShell y en bash:
 
-```bash
-gh repo create MI-ORG/taller-workflows-TU-USUARIO \
-  --template MI-ORG/taller-workflows-plantilla \
-  --private --clone
-
+```powershell
+gh repo create MI-ORG/taller-workflows-TU-USUARIO --template MI-ORG/taller-workflows-plantilla --private --clone
 cd taller-workflows-TU-USUARIO
 ```
 
@@ -233,7 +257,7 @@ eligiendo **tu organización** como *Owner*.
 </details>
 
 > [!CAUTION]
-> **¿Te salió este error?**
+> **¿Te salió este error al usar `--template`?**
 >
 > ```text
 > GraphQL: Unauthorized: As an Enterprise Managed User,
@@ -242,23 +266,11 @@ eligiendo **tu organización** como *Owner*.
 >
 > No es un problema de permisos de tu repositorio ni de tu organización. Tu
 > cuenta es un **Enterprise Managed User**: puede **leer** repositorios públicos,
-> pero no puede usarlos como plantilla, ni hacerles fork, ni darles estrella. La
-> restricción aplica a todo, incluida la API.
+> pero no puede usarlos como plantilla, ni hacerles fork, ni darles estrella.
 >
-> **La solución es la opción 🅰️**: descargar el contenido y subirlo tú. El script
-> ya lo hace. Si prefieres a mano:
->
-> ```bash
-> curl -fsSL -o taller.zip https://codeload.github.com/PROPIETARIO/github-workflows-workshop-fundamentos-enterprise/zip/refs/heads/main
-> unzip -q taller.zip && mv *-main taller-workflows-TU-USUARIO && cd $_
-> git init -b main && git add -A && git commit -m "chore: taller de GitHub Actions"
-> gh repo create MI-ORG/taller-workflows-TU-USUARIO --private --source=. --push
-> ```
->
-> Tranquilo: **el taller entero funciona con EMU.** Lo único que no puedes es
-> copiar la plantilla desde fuera de la empresa. Los workflows, las acciones de
-> `actions/*`, los rulesets y los releases funcionan igual.
-
+> **La solución es la opción 🅰️** (el script), que descarga el contenido y lo
+> sube a tu organización. Todo lo demás del taller funciona igual con EMU:
+> workflows, acciones de `actions/*`, rulesets y releases.
 > [!WARNING]
 > **No uses fork.** Un EMU no puede hacer fork de repositorios de fuera de la
 > empresa, y dentro de las organizaciones nuevas el fork de repos privados e
@@ -1519,11 +1531,22 @@ Si tu empresa usa **Enterprise Managed Users**, los participantes **no pueden**
 usar «Use this template» contra un repositorio público de fuera. Déjales la
 plantilla dentro y les devuelves el comando de una línea:
 
-```bash
-# 1. Trae el contenido a tu organización
-bash scripts/crear-mi-repo.sh MI-ORG taller-workflows-plantilla internal
+Descarga el script como en el [paso 3](#3--crea-tu-copia-del-taller) y ejecútalo
+con el nombre `taller-workflows-plantilla` y visibilidad **interna**:
 
-# 2. Márcalo como plantilla
+```powershell
+# 🪟 PowerShell
+powershell -ExecutionPolicy Bypass -File .\crear-mi-repo.ps1 -Organizacion MI-ORG -Nombre taller-workflows-plantilla -Visibilidad internal
+```
+
+```bash
+# 🐧🍎 bash
+bash crear-mi-repo.sh MI-ORG taller-workflows-plantilla internal
+```
+
+Después márcalo como plantilla (este comando sirve en las dos terminales):
+
+```bash
 gh api -X PATCH repos/MI-ORG/taller-workflows-plantilla -F is_template=true
 ```
 
@@ -1531,8 +1554,7 @@ Usa **`internal`**: así todo el mundo en la empresa puede leerlo sin que tengas
 que dar permisos uno por uno. Después, cada participante ejecuta:
 
 ```bash
-gh repo create MI-ORG/taller-workflows-SU-USUARIO \
-  --template MI-ORG/taller-workflows-plantilla --private --clone
+gh repo create MI-ORG/taller-workflows-SU-USUARIO --template MI-ORG/taller-workflows-plantilla --private --clone
 ```
 
 **Con los participantes, días antes:**
