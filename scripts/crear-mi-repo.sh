@@ -26,6 +26,8 @@ done
 
 USUARIO="$(gh api user --jq .login 2>/dev/null)" || { echo "No has iniciado sesion. Ejecuta: gh auth login" >&2; exit 1; }
 echo "Sesion de GitHub: $USUARIO"
+# Para que 'git push' use esta misma cuenta y no otra guardada en el equipo.
+gh auth setup-git >/dev/null 2>&1 || true
 if gh repo view "$ORGANIZACION/$NOMBRE" --json name >/dev/null 2>&1; then
   echo "El repositorio $ORGANIZACION/$NOMBRE YA EXISTE. Usa otro nombre, o si es tuyo: gh repo clone $ORGANIZACION/$NOMBRE" >&2
   exit 1

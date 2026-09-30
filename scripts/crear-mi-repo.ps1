@@ -33,6 +33,8 @@ foreach ($cmd in 'git', 'gh') {
 $usuario = (gh api user --jq .login 2>$null)
 if ($LASTEXITCODE -ne 0 -or -not $usuario) { Fallo "No has iniciado sesion en GitHub CLI. Ejecuta: gh auth login" }
 Write-Host "    Sesion de GitHub: $usuario"
+# Para que 'git push' use esta misma cuenta y no otra guardada en el equipo.
+gh auth setup-git 2>$null
 
 $null = (gh repo view "$Organizacion/$Nombre" --json name 2>$null)
 if ($LASTEXITCODE -eq 0) {

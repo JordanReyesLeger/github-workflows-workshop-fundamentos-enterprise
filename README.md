@@ -171,10 +171,27 @@ y la extensión de [GitHub Actions](https://marketplace.visualstudio.com/items?i
 
 ### 2 · Autentícate
 
+Estos comandos sirven igual en PowerShell y en bash:
+
 ```bash
-gh auth login
+gh auth login                         # entra con tu cuenta de la EMPRESA
+gh auth setup-git                     # git usará esa misma cuenta en push y pull
 gh api user/orgs --jq '.[].login'     # debes ver tu organización
 ```
+
+> [!IMPORTANT]
+> **No te saltes `gh auth setup-git`.** Si en tu equipo también tienes una cuenta
+> **personal** de GitHub, git puede usarla al hacer `git push`. Como esa cuenta
+> no ve los repositorios privados de tu empresa, GitHub responde con:
+>
+> ```text
+> remote: Repository not found.
+> fatal: repository 'https://github.com/MI-ORG/taller-workflows-TU-USUARIO.git/' not found
+> ```
+>
+> El repositorio sí existe: git entró con la cuenta equivocada. `gh auth setup-git`
+> lo corrige. Si tienes varias cuentas en `gh`, elige la de la empresa con
+> `gh auth switch`.
 
 > [!NOTE]
 > Si tu empresa usa **SSO**, puede que tengas que autorizar el token para la
@@ -223,6 +240,7 @@ cd taller-workflows-TU-USUARIO
 > | Una URL con **`/blob/`** (`github.com/.../blob/main/...`) | Descarga la **página web** en HTML, no el script | Usa la URL **`raw.githubusercontent.com`** de arriba |
 > | `.\crear-mi-repo.ps1` a secas | La política de ejecución de Windows puede bloquearlo | Ejecútalo con `powershell -ExecutionPolicy Bypass -File` |
 > | `YA EXISTE` | Ese repositorio ya está en tu organización | Elige otro `-Nombre`, o clónalo con `gh repo clone` si es tuyo |
+> | `git push` → `Repository not found` | git entró con otra cuenta (por ejemplo, la personal) | `gh auth setup-git` (ver [paso 2](#2--autentícate)) |
 
 #### 🅰️ Con el script, en 🐧🍎 Linux / macOS (bash)
 
