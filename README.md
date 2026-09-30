@@ -2,15 +2,15 @@
 
 # 🏢 Taller de GitHub Actions · Edición Enterprise
 
-### De cero a un pipeline completo, en una hora, con Copilot de copiloto
+### De cero a un pipeline completo, en poco más de una hora, con Copilot de copiloto
 
 ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
 ![GitHub Enterprise](https://img.shields.io/badge/GitHub%20Enterprise-24292F?style=for-the-badge&logo=github&logoColor=white)
 ![GitHub Copilot](https://img.shields.io/badge/GitHub%20Copilot-000000?style=for-the-badge&logo=githubcopilot&logoColor=white)
 ![.NET](https://img.shields.io/badge/.NET%2010-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
 
-![Duración](https://img.shields.io/badge/Duración-1%20hora-success)
-![Módulos](https://img.shields.io/badge/Módulos-6-blue)
+![Duración](https://img.shields.io/badge/Duración-75%20min-success)
+![Módulos](https://img.shields.io/badge/Módulos-7-blue)
 ![Método](https://img.shields.io/badge/Método-Copilot%20primero-black)
 ![Repositorio](https://img.shields.io/badge/Repositorio-Privado%20o%20interno-informational)
 ![Idioma](https://img.shields.io/badge/Idioma-Español-yellow)
@@ -35,6 +35,7 @@
 | 4️⃣ | [Módulo 4 · Proteger la rama main](#4️⃣-módulo-4--proteger-la-rama-main) | 12 min |
 | 5️⃣ | [Módulo 5 · Push protection](#5️⃣-módulo-5--push-protection) | 8 min |
 | 6️⃣ | [Módulo 6 · Releases automáticos](#6️⃣-módulo-6--releases-automáticos) | 10 min |
+| 7️⃣ | [Módulo 7 · Entornos dev y prod con aprobadores](#7️⃣-módulo-7--entornos-dev-y-prod-con-aprobadores) | 12 min |
 | ➕ | [Extras opcionales](#-extras-opcionales) | +30 min |
 | 📖 | [Referencia rápida](#-referencia-rápida) | — |
 | 🚧 | [Políticas de tu organización](#-políticas-de-tu-organización) | — |
@@ -46,7 +47,7 @@
 
 ## 🎯 Qué vas a construir
 
-En **una hora**, dentro de **tu organización**, en un repositorio **privado o
+En **poco más de una hora**, dentro de **tu organización**, en un repositorio **privado o
 interno**:
 
 | | Resultado |
@@ -56,6 +57,7 @@ interno**:
 | 🛡️ | La rama `main` **protegida**: sin CI en verde no hay merge |
 | 🔒 | **Push protection** activo: GitHub te impide subir un secreto |
 | 🏷️ | Un **release publicado solo** al empujar un tag |
+| 🚦 | Despliegue a **dev** y **prod**, cada uno con **sus variables**, y prod con **aprobador** |
 | 🔐 | Todo con **permisos mínimos** y **cero acciones de terceros** |
 
 ### 🏢 Por qué una edición Enterprise
@@ -1204,12 +1206,348 @@ marca **Restrict creations**, **Restrict updates** y **Restrict deletions**.
 
 ---
 
+## 7️⃣ Módulo 7 · Entornos dev y prod con aprobadores
+
+> ⏱️ **12 minutos** · El cierre: así se despliega en una empresa
+
+### 🎯 Qué vas a lograr
+
+Un pipeline que **construye una sola vez** y despliega ese mismo paquete en dos
+ambientes, **cada uno con su propia configuración**:
+
+```mermaid
+flowchart LR
+    A[🔨 Construir paquete] --> B[🧪 dev<br/>automático]
+    B --> C{👤 Aprobador<br/>Approve and deploy}
+    C --> D[🚀 prod<br/>solo desde main]
+    style A fill:#2088FF,color:#fff
+    style B fill:#2DA44E,color:#fff
+    style C fill:#BF8700,color:#fff
+    style D fill:#CF222E,color:#fff
+```
+
+| | `dev` | `prod` |
+|---|---|---|
+| **Cuándo se despliega** | Solo, en cuanto termina la construcción | Cuando **un aprobador** lo autoriza |
+| **Desde qué ramas** | Cualquiera | **Solo `main`** |
+| `AMBIENTE` | `Desarrollo` | `Producción` |
+| `URL_APP` | `https://dev.contosobiker.example` | `https://contosobiker.example` |
+| `NIVEL_LOG` | `Debug` | `Warning` |
+| 🔒 Secreto `CLAVE_API` | `dev-clave-de-prueba` | `prod-clave-de-prueba` |
+
+### 🧠 Los tres conceptos
+
+| Concepto | Qué es |
+|----------|--------|
+| **Entorno** (*environment*) | Un destino con nombre, con **sus propias variables, secretos y reglas**. El job que dice `environment: prod` recibe lo de `prod` |
+| **Variable vs. secreto** | Las dos se leen igual. La variable (`vars.X`) se ve en los logs; el secreto (`secrets.X`) sale como `***` |
+| **Regla de protección** | Lo que el entorno exige antes de dejar entrar al job: **aprobadores** y **ramas permitidas** |
+
+> [!NOTE]
+> 🏢 En repositorios **privados o internos**, los aprobadores y las restricciones
+> de rama de un entorno requieren **GitHub Enterprise**. Tu organización lo tiene;
+> en un plan Free o Team solo funcionan en repos públicos.
+
+### 🔧 Paso 1 · Crea los dos entornos
+
+**Settings → Environments → New environment**
+
+**`dev`:** escribe el nombre, pulsa **Configure environment** y no actives ninguna
+protección. En **Environment variables → Add environment variable** crea:
+
+| Name | Value |
+|------|-------|
+| `AMBIENTE` | `Desarrollo` |
+| `URL_APP` | `https://dev.contosobiker.example` |
+| `NIVEL_LOG` | `Debug` |
+
+Y en **Environment secrets → Add environment secret**: `CLAVE_API` =
+`dev-clave-de-prueba`.
+
+**`prod`:** crea el entorno y configúralo así:
+
+| Opción | Valor |
+|--------|-------|
+| ☑️ **Required reviewers** | Agrégate **a ti** (en tu trabajo real: un **equipo**) |
+| ☐ *Prevent self-review* | **Desmárcalo** en el taller: si no, no podrías aprobar tu propio despliegue |
+| **Deployment branches and tags** | **Selected branches and tags → Add deployment branch or tag rule** → `main` |
+| Variables | `AMBIENTE` = `Producción` · `URL_APP` = `https://contosobiker.example` · `NIVEL_LOG` = `Warning` |
+| Secreto | `CLAVE_API` = `prod-clave-de-prueba` |
+
+Pulsa **Save protection rules**.
+
+Por último, una variable **del repositorio**, común a todos los entornos:
+**Settings → Secrets and variables → Actions → Variables → New repository
+variable** → `NOMBRE_APP` = `Contoso Biker`.
+
+> [!TIP]
+> Si una variable existe en el repositorio **y** en el entorno con el mismo
+> nombre, **gana la del entorno**. Por eso lo común va en el repositorio y lo que
+> cambia por ambiente, en cada entorno.
+
+<details>
+<summary>💻 <b>¿Prefieres hacerlo por terminal? Pídeselo a Copilot</b></summary>
+
+```text
+Dame los comandos de GitHub CLI para, en el repo MI-ORG/TU-REPO:
+crear el entorno "dev" sin protecciones y el entorno "prod" con mi
+usuario como required reviewer, prevent_self_review en false y
+despliegue permitido solo desde la rama main; crear en cada entorno
+las variables AMBIENTE, URL_APP y NIVEL_LOG y el secreto CLAVE_API;
+y la variable de repositorio NOMBRE_APP.
+```
+
+El resultado debería parecerse a esto (funciona igual en PowerShell y en bash):
+
+```bash
+# Entornos
+gh api -X PUT repos/MI-ORG/TU-REPO/environments/dev
+gh api -X PUT repos/MI-ORG/TU-REPO/environments/prod --input prod.json
+gh api -X POST repos/MI-ORG/TU-REPO/environments/prod/deployment-branch-policies -f name=main -f type=branch
+
+# Variables y secretos por entorno
+gh variable set AMBIENTE  --env dev  --body "Desarrollo"                       -R MI-ORG/TU-REPO
+gh variable set URL_APP   --env dev  --body "https://dev.contosobiker.example" -R MI-ORG/TU-REPO
+gh variable set NIVEL_LOG --env dev  --body "Debug"                            -R MI-ORG/TU-REPO
+gh secret   set CLAVE_API --env dev  --body "dev-clave-de-prueba"              -R MI-ORG/TU-REPO
+gh variable set AMBIENTE  --env prod --body "Producción"                       -R MI-ORG/TU-REPO
+gh variable set URL_APP   --env prod --body "https://contosobiker.example"     -R MI-ORG/TU-REPO
+gh variable set NIVEL_LOG --env prod --body "Warning"                          -R MI-ORG/TU-REPO
+gh secret   set CLAVE_API --env prod --body "prod-clave-de-prueba"             -R MI-ORG/TU-REPO
+
+# Variable común del repositorio
+gh variable set NOMBRE_APP --body "Contoso Biker" -R MI-ORG/TU-REPO
+```
+
+Donde `prod.json` es (cambia `12345678` por tu id: `gh api user --jq .id`):
+
+```json
+{
+  "reviewers": [{ "type": "User", "id": 12345678 }],
+  "prevent_self_review": false,
+  "deployment_branch_policy": { "protected_branches": false, "custom_branch_policies": true }
+}
+```
+
+</details>
+
+> [!WARNING]
+> **Crea los entornos antes de ejecutar el workflow.** Si un job usa un entorno
+> que no existe, GitHub **lo crea solo, sin protecciones**, y el job pasa de largo
+> sin esperar a nadie. No falla ni avisa: simplemente no hay puerta.
+
+### 🤖 Paso 2 · Pídele el workflow a Copilot
+
+Crea `.github/workflows/03-desplegar.yml` y pide:
+
+```text
+Crea un workflow de GitHub Actions llamado "03 · Desplegar" que:
+- Se dispare con push a main y también manualmente (workflow_dispatch)
+- Tenga permisos de solo lectura
+- Tenga un job "Construir paquete" que haga dotnet publish de
+  src/ContosoBiker.Tarifas/ContosoBiker.Tarifas.csproj en Release y suba
+  la carpeta como artefacto llamado "paquete"
+- Tenga un job "Desplegar en dev" con environment dev y otro
+  "Desplegar en prod" con environment prod, encadenados con needs
+  (construir → dev → prod), cada uno con la url del entorno tomada de
+  vars.URL_APP
+- En cada despliegue, descargue el artefacto y simule el despliegue con
+  echo mostrando vars.NOMBRE_APP, vars.AMBIENTE, vars.URL_APP,
+  vars.NIVEL_LOG y el secreto CLAVE_API pasado por env, y escriba un
+  resumen en GITHUB_STEP_SUMMARY
+Usa solo acciones de actions/*.
+```
+
+### ✅ Paso 3 · Revisa estas cuatro cosas
+
+| Revisa | Debe estar | Si falta |
+|--------|------------|----------|
+| **`environment:`** en los jobs de despliegue | `name: dev` / `name: prod`, **escritos igual** que en Settings | Si el nombre no coincide, GitHub crea otro entorno **sin protecciones** |
+| **`needs:`** | `construir → dev → prod` | Prod podría desplegarse aunque dev falle |
+| **`vars.`** y **`secrets.`** | Variables con `vars.`, la clave con `secrets.` | `${{ vars.CLAVE_API }}` saldría vacía |
+| **El secreto va por `env:`** | `CLAVE_API: ${{ secrets.CLAVE_API }}` y en el script `$CLAVE_API` | Meter `${{ secrets.X }}` dentro del `run:` es un riesgo de inyección |
+
+<details>
+<summary>📄 <b>Compara con la referencia</b></summary>
+
+```yaml
+name: 03 · Desplegar
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  construir:
+    name: Construir paquete
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v7
+
+      - name: Instalar el SDK de .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publicar la librería
+        run: dotnet publish src/ContosoBiker.Tarifas/ContosoBiker.Tarifas.csproj --configuration Release --output publicacion
+
+      - name: Guardar el paquete
+        uses: actions/upload-artifact@v7
+        with:
+          name: paquete
+          path: publicacion/
+
+  desplegar-dev:
+    name: Desplegar en dev
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: ${{ vars.URL_APP }}
+    steps:
+      - name: Descargar el paquete
+        uses: actions/download-artifact@v8
+        with:
+          name: paquete
+
+      - name: Desplegar (simulado)
+        env:
+          CLAVE_API: ${{ secrets.CLAVE_API }}
+        run: |
+          echo "Aplicación : ${{ vars.NOMBRE_APP }}"
+          echo "Ambiente   : ${{ vars.AMBIENTE }}"
+          echo "URL        : ${{ vars.URL_APP }}"
+          echo "Nivel log  : ${{ vars.NIVEL_LOG }}"
+          echo "Clave API  : $CLAVE_API"
+          echo "### 🚀 Desplegado en ${{ vars.AMBIENTE }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "URL: ${{ vars.URL_APP }} · Log: ${{ vars.NIVEL_LOG }}" >> "$GITHUB_STEP_SUMMARY"
+
+  desplegar-prod:
+    name: Desplegar en prod
+    needs: desplegar-dev
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+      url: ${{ vars.URL_APP }}
+    steps:
+      - name: Descargar el paquete
+        uses: actions/download-artifact@v8
+        with:
+          name: paquete
+
+      - name: Desplegar (simulado)
+        env:
+          CLAVE_API: ${{ secrets.CLAVE_API }}
+        run: |
+          echo "Aplicación : ${{ vars.NOMBRE_APP }}"
+          echo "Ambiente   : ${{ vars.AMBIENTE }}"
+          echo "URL        : ${{ vars.URL_APP }}"
+          echo "Nivel log  : ${{ vars.NIVEL_LOG }}"
+          echo "Clave API  : $CLAVE_API"
+          echo "### 🚀 Desplegado en ${{ vars.AMBIENTE }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "URL: ${{ vars.URL_APP }} · Log: ${{ vars.NIVEL_LOG }}" >> "$GITHUB_STEP_SUMMARY"
+```
+
+Los dos jobs de despliegue tienen **exactamente los mismos pasos**. Lo único que
+cambia es `environment:`, y con eso cambian todos los valores. **Esa es la idea
+de un entorno.**
+
+</details>
+
+### ▶️ Paso 4 · Despliega y aprueba
+
+`main` está protegida, así que súbelo por PR:
+
+```bash
+git switch main && git pull
+git switch -c ci/desplegar
+git add .github/workflows/03-desplegar.yml
+git commit -m "ci: desplegar a dev y prod con aprobación"
+git push -u origin ci/desplegar
+gh pr create --fill --base main
+gh pr merge --squash --delete-branch    # cuando el check esté verde
+```
+
+El merge es un push a `main` y dispara el despliegue. Abre la pestaña
+**Actions → 03 · Desplegar** y verás:
+
+```text
+✅ Construir paquete
+✅ Desplegar en dev        https://dev.contosobiker.example
+⏸️ Desplegar en prod       Waiting for review
+```
+
+Pulsa **Review deployments** → marca **prod** → escribe un comentario →
+**Approve and deploy**. Prod arranca en ese momento.
+
+### 🔎 Paso 5 · Compara los dos logs
+
+Abre el paso **Desplegar (simulado)** de cada job:
+
+| Desplegar en dev | Desplegar en prod |
+|---|---|
+| `Aplicación : Contoso Biker` | `Aplicación : Contoso Biker` |
+| `Ambiente   : Desarrollo` | `Ambiente   : Producción` |
+| `URL        : https://dev.contosobiker.example` | `URL        : https://contosobiker.example` |
+| `Nivel log  : Debug` | `Nivel log  : Warning` |
+| `Clave API  : ***` | `Clave API  : ***` |
+
+- `NOMBRE_APP` es **igual** en los dos: viene del repositorio.
+- El resto **cambia solo** según el entorno, con el mismo YAML.
+- El secreto nunca se imprime: GitHub lo reemplaza por `***`.
+
+En la portada del repositorio, a la derecha, aparece ahora **Deployments** con
+el historial de qué versión está en cada ambiente, y quién aprobó prod.
+
+### 🛑 Paso 6 · Comprueba que prod solo acepta main
+
+Lanza el workflow a mano desde otra rama:
+
+```bash
+git switch -c feature/probar-prod
+git push -u origin feature/probar-prod
+gh workflow run 03-desplegar.yml --ref feature/probar-prod
+```
+
+Dev se despliega (acepta cualquier rama), pero prod falla **sin pedir siquiera
+aprobación**:
+
+```text
+Branch "feature/probar-prod" is not allowed to deploy to prod
+due to environment protection rules.
+```
+
+Limpia:
+
+```bash
+git switch main
+git push origin --delete feature/probar-prod
+git branch -D feature/probar-prod
+```
+
+### 💡 Paso 7 · Por qué era así
+
+| Decisión | Razón |
+|----------|-------|
+| Construir **una vez** y desplegar el artefacto | Lo que llega a prod es **exactamente** lo que se probó en dev |
+| Variables en el entorno, no en el YAML | Cambiar una URL de prod no necesita un PR ni tocar el pipeline |
+| Secretos por entorno | La clave de prod **solo** existe en el job que despliega a prod |
+| Aprobador = **equipo** | Si pones a una persona, sus vacaciones detienen los despliegues |
+| Solo `main` despliega a prod | Una rama experimental no puede llegar a producción, ni por error |
+
 <div align="center">
 
-## 🎉 Terminaste la hora
+## 🎉 Terminaste el taller
 
 Tu repositorio compila, prueba, reporta, bloquea merges en rojo, rechaza
-secretos y publica releases. Con permisos mínimos y sin dependencias de terceros.
+secretos, publica releases y **despliega por ambientes con aprobación**. Con
+permisos mínimos y sin dependencias de terceros.
 
 </div>
 
@@ -1301,39 +1639,6 @@ con una clave basada en el hash de los archivos .csproj.
 
 `actions/setup-dotnet` ya trae caché con `cache: true`. El mecanismo es el mismo
 para npm, pip o Maven.
-
-</details>
-
-<details>
-<summary><b>🚦 Entornos con aprobación manual 🔐</b></summary>
-
-Lo que más se parece a tu trabajo real: que un despliegue **espere a que alguien
-autorizado apriete el botón**.
-
-**Settings → Environments → New environment** → `produccion`, y activa
-**Required reviewers**.
-
-```yaml
-jobs:
-  desplegar:
-    runs-on: ubuntu-latest
-    environment: produccion      # 🔐 aquí se detiene y espera
-    steps:
-      - run: echo "Desplegando..."
-```
-
-> [!WARNING]
-> **Crea el entorno primero.** Si referencias uno que no existe, GitHub **lo
-> crea solo, sin protecciones**, y el job pasa de largo sin esperar a nadie. No
-> falla ni avisa: simplemente no hay puerta. Compruébalo con:
->
-> ```bash
-> gh api repos/MI-ORG/TU-REPO/environments --jq '.environments[].name'
-> ```
-
-> [!IMPORTANT]
-> En repos **privados o internos**, los *required reviewers* y el *wait timer*
-> requieren **GitHub Enterprise**. Con Team o Pro solo funcionan en públicos.
 
 </details>
 
@@ -1460,6 +1765,8 @@ permissions:
 | `${{ job.status }}` | `success`, `failure` o `cancelled` |
 | `${{ needs.<job>.result }}` | Resultado de un job del que dependes |
 | `${{ secrets.GITHUB_TOKEN }}` | El token temporal de la ejecución |
+| `${{ vars.NOMBRE }}` | Una variable del repositorio, de la organización o del entorno del job |
+| `${{ secrets.NOMBRE }}` | Un secreto; en los logs sale como `***` |
 
 ### 📁 Variables especiales
 
@@ -1567,6 +1874,13 @@ Gracias.
 - [ ] Lo hace **sin ninguna acción de terceros**
 - [ ] Adjunta el `.nupkg` y genera las notas solo
 
+### 🚦 Tus despliegues
+
+- [ ] Existen los entornos `dev` y `prod`, cada uno con sus variables y su secreto
+- [ ] Dev se despliega solo; prod **espera a un aprobador**
+- [ ] Prod **rechaza** despliegues desde ramas que no son `main`
+- [ ] Los logs muestran valores distintos por ambiente y el secreto como `***`
+
 ### 🧠 Lo que ya entiendes
 
 - [ ] Evento, workflow, job, runner y step
@@ -1575,6 +1889,7 @@ Gracias.
 - [ ] Qué hace `if: always()` y cuándo es obligatorio
 - [ ] Por qué se bloquea un secreto **antes** de subirlo
 - [ ] Qué revisar siempre en el YAML que genera Copilot
+- [ ] Qué es un entorno, y la diferencia entre `vars.` y `secrets.`
 
 ### 🏢 Lo que ya entiendes de tu organización
 
@@ -1597,6 +1912,8 @@ Gracias.
 - [ ] Que la política de acciones permita **`actions/*`**
 - [ ] Que los **runners hospedados** estén habilitados
 - [ ] Que haya **licencias de GitHub Secret Protection** para el Módulo 5
+- [ ] Que el plan sea **GitHub Enterprise**: los aprobadores de entornos del
+      Módulo 7 no funcionan en repos privados con Free o Team
 - [ ] **Haz una prueba real del Módulo 5** en un repo privado de la organización:
       te toma 2 minutos y es el único paso que depende de licencias
 
@@ -1646,7 +1963,7 @@ gh repo create MI-ORG/taller-workflows-SU-USUARIO --template MI-ORG/taller-workf
 </details>
 
 <details>
-<summary><b>⏱️ Agenda de 60 minutos</b></summary>
+<summary><b>⏱️ Agenda de 75 minutos</b></summary>
 
 | Minuto | Módulo | Modo |
 |--------|--------|------|
@@ -1656,13 +1973,17 @@ gh repo create MI-ORG/taller-workflows-SU-USUARIO --template MI-ORG/taller-workf
 | 28-36 | 3 · Artefactos y resumen | Práctica |
 | 36-48 | 4 · Proteger main | Guiado ⭐ |
 | 48-56 | 5 · Push protection | Guiado ⭐ |
-| 56-66 | 6 · Releases | Guiado + cierre |
+| 56-66 | 6 · Releases | Guiado |
+| 66-78 | 7 · Entornos dev y prod | Guiado ⭐ + cierre |
 
-Los tres ⭐ son los que no debes recortar: **ver el pipeline en rojo**, **ver el
-merge bloqueado** y **ver el push rechazado**. Ahí está el valor del taller.
+Los cuatro ⭐ son los que no debes recortar: **ver el pipeline en rojo**, **ver el
+merge bloqueado**, **ver el push rechazado** y **aprobar el despliegue a prod**.
+Ahí está el valor del taller.
 
-**Si tienes 90 minutos:** agrega los extras de jobs encadenados y entornos con
-aprobación.
+**Si solo tienes 60 minutos:** crea tú los entornos del Módulo 7 antes de la
+sesión (con los comandos de `gh` del paso 1) o sáltate el Módulo 6.
+
+**Si tienes 90 minutos:** agrega el extra de jobs encadenados.
 
 </details>
 
@@ -1676,6 +1997,8 @@ aprobación.
 | 3 | Módulo 4: no aparece el check en el ruleset | Solo aparece si el job ya corrió una vez |
 | 4 | Módulo 5: el interruptor está bloqueado | Depende de licencias. Ten un repo público de respaldo |
 | 5 | Módulo 6: `git push` no envía tags | Escríbelo en la pizarra: `git push origin v1.0.0` |
+| 6 | Módulo 7: prod no espera aprobación | El nombre en `environment:` no coincide con Settings, y GitHub creó otro entorno vacío |
+| 7 | Módulo 7: no pueden aprobar su propio despliegue | Quedó marcado *Prevent self-review* en `prod` |
 
 </details>
 
@@ -1686,7 +2009,7 @@ aprobación.
 |----------|-------|
 | Copilot genera, tú revisas | Escribir YAML a mano no enseña nada y consume la mitad del tiempo |
 | Un solo README | Nadie navega carpetas en vivo. `Ctrl+F` y estás donde necesitas |
-| Una hora, seis módulos | Un taller de dos horas pierde a la gente en la segunda |
+| Una hora y cuarto, siete módulos | Un taller de dos horas pierde a la gente en la segunda |
 | Repos privados o internos | Es donde se trabaja. Y los rulesets ya no necesitan repos públicos |
 | Cero acciones de terceros | Una lista blanca no debería arruinar el taller a mitad |
 | Push protection con token oficial | Un token inventado **no** dispara el bloqueo |
