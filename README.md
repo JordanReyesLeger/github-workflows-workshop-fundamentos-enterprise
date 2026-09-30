@@ -2488,6 +2488,18 @@ Cuando el pipeline llegue a ese job, se queda en **Waiting**, notifica a los
 revisores, y no avanza hasta que alguien apruebe desde la interfaz. Queda
 registrado quién aprobó y cuándo.
 
+> [!WARNING]
+> **Primero crea el entorno, después referéncialo.** Si pones
+> `environment: produccion` sin haber configurado el entorno, GitHub **lo crea
+> solo, sin ninguna protección**, y el job se ejecuta de corrido sin esperar a
+> nadie. No falla ni te avisa: simplemente no hay puerta.
+>
+> Compruébalo con:
+>
+> ```bash
+> gh api repos/MI-ORG/MI-REPO/environments --jq '.environments[].name'
+> ```
+
 > [!IMPORTANT]
 > **Requisito de plan.** En repositorios **privados o internos**, los *required
 > reviewers* y el *wait timer* requieren **GitHub Enterprise**. Con Team o Pro
