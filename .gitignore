@@ -1,0 +1,22 @@
+# .NET
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+project.lock.json
+artifacts/
+paquetes/
+reportes/
+TestResults/
+*.trx
+
+# Herramientas
+.vs/
+.vscode/
+.idea/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
