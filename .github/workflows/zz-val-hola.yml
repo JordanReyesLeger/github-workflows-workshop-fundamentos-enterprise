@@ -1,0 +1,29 @@
+name: VAL hola
+
+on:
+  workflow_dispatch:
+    inputs:
+      nombre:
+        description: "¿Cómo te llamas?"
+        required: true
+        default: "ciclista"
+
+permissions:
+  contents: read
+
+jobs:
+  saludar:
+    name: Saludar y mostrar el contexto
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Saludar a la persona
+        run: echo "¡Hola, ${{ inputs.nombre }}! Bienvenido a GitHub Actions."
+
+      - name: Mostrar el contexto
+        run: |
+          echo "Repositorio  : ${{ github.repository }}"
+          echo "Organización : ${{ github.repository_owner }}"
+          echo "Rama         : ${{ github.ref_name }}"
+          echo "Evento       : ${{ github.event_name }}"
+          echo "Ejecutado por: ${{ github.actor }}"

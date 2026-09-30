@@ -1,0 +1,51 @@
+name: VAL release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publicar:
+    name: Empaquetar y publicar
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v7
+
+      - name: Instalar el SDK de .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Leer la versión del tag
+        id: version
+        run: echo "numero=0.0.9" >> "$GITHUB_OUTPUT"
+
+      - name: Compilar en Release
+        run: dotnet build TallerWorkflows.sln --configuration Release
+
+      - name: Ejecutar pruebas
+        run: dotnet test TallerWorkflows.sln --configuration Release --no-build
+
+      - name: Empaquetar la librería
+        run: |
+          dotnet pack src/ContosoBiker.Tarifas/ContosoBiker.Tarifas.csproj \
+            --configuration Release \
+            --no-build \
+            -p:PackageVersion=${{ steps.version.outputs.numero }} \
+            --output paquetes
+
+      - name: Publicar el release en GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v0.0.9" \
+            paquetes/*.nupkg \
+            --title "Contoso Biker Tarifas v0.0.9" \
+            --generate-notes
