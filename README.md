@@ -180,22 +180,89 @@ gh api user/orgs --jq '.[].login'     # debes ver tu organización
 > Si tu empresa usa **SSO**, puede que tengas que autorizar el token para la
 > organización. GitHub te da el enlace en el propio mensaje de error.
 
-### 3 · Crea tu copia desde la plantilla
+### 3 · Crea tu copia del taller
+
+Elige **una** de las dos formas. Las dos funcionan con cuentas normales y con
+**Enterprise Managed Users (EMU)**.
+
+<details open>
+<summary><b>🅰️ Con el script (la más simple, y siempre funciona)</b></summary>
+
+Descarga el contenido, crea el repositorio en tu organización y lo sube. Un solo
+comando:
+
+```powershell
+# Windows
+pwsh scripts/crear-mi-repo.ps1 -Organizacion MI-ORG -Nombre taller-workflows-TU-USUARIO
+```
+
+```bash
+# Linux y macOS
+bash scripts/crear-mi-repo.sh MI-ORG taller-workflows-TU-USUARIO
+```
+
+¿No tienes el repositorio en local todavía? Descarga solo el script:
+
+```bash
+curl -fsSL -o crear-mi-repo.sh \
+  https://raw.githubusercontent.com/PROPIETARIO/github-workflows-workshop-fundamentos-enterprise/main/scripts/crear-mi-repo.sh
+bash crear-mi-repo.sh MI-ORG taller-workflows-TU-USUARIO
+```
+
+Agrega `internal` al final si tu organización lo prefiere sobre `private`.
+
+</details>
+
+<details>
+<summary><b>🅱️ Con «Use this template» (si la plantilla ya está en tu empresa)</b></summary>
+
+Si quien imparte el taller ya dejó una copia de la plantilla **dentro de tu
+organización**, tienes la vía corta:
 
 ```bash
 gh repo create MI-ORG/taller-workflows-TU-USUARIO \
-  --template PROPIETARIO/github-workflows-workshop-fundamentos-enterprise \
+  --template MI-ORG/taller-workflows-plantilla \
   --private --clone
 
 cd taller-workflows-TU-USUARIO
 ```
 
-O desde el navegador: botón **Use this template** → **Create a new repository**,
-eligiendo **tu organización** como *Owner* y visibilidad **Private** o **Internal**.
+O desde el navegador: **Use this template** → **Create a new repository**,
+eligiendo **tu organización** como *Owner*.
+
+</details>
+
+> [!CAUTION]
+> **¿Te salió este error?**
+>
+> ```text
+> GraphQL: Unauthorized: As an Enterprise Managed User,
+> you cannot access this content (cloneTemplateRepository)
+> ```
+>
+> No es un problema de permisos de tu repositorio ni de tu organización. Tu
+> cuenta es un **Enterprise Managed User**: puede **leer** repositorios públicos,
+> pero no puede usarlos como plantilla, ni hacerles fork, ni darles estrella. La
+> restricción aplica a todo, incluida la API.
+>
+> **La solución es la opción 🅰️**: descargar el contenido y subirlo tú. El script
+> ya lo hace. Si prefieres a mano:
+>
+> ```bash
+> curl -fsSL -o taller.zip https://codeload.github.com/PROPIETARIO/github-workflows-workshop-fundamentos-enterprise/zip/refs/heads/main
+> unzip -q taller.zip && mv *-main taller-workflows-TU-USUARIO && cd $_
+> git init -b main && git add -A && git commit -m "chore: taller de GitHub Actions"
+> gh repo create MI-ORG/taller-workflows-TU-USUARIO --private --source=. --push
+> ```
+>
+> Tranquilo: **el taller entero funciona con EMU.** Lo único que no puedes es
+> copiar la plantilla desde fuera de la empresa. Los workflows, las acciones de
+> `actions/*`, los rulesets y los releases funcionan igual.
 
 > [!WARNING]
-> **No uses fork.** En las organizaciones nuevas, el fork de repositorios
-> privados e internos viene deshabilitado por omisión.
+> **No uses fork.** Un EMU no puede hacer fork de repositorios de fuera de la
+> empresa, y dentro de las organizaciones nuevas el fork de repos privados e
+> internos viene deshabilitado por omisión.
 
 ### 4 · Comprueba que todo arranca
 
@@ -1355,6 +1422,7 @@ dice `not allowed` o `disabled`, o el job nunca arranca, es una política.
 
 | Lo que ves | Qué pedirle a tu administrador |
 |------------|-------------------------------|
+| `As an Enterprise Managed User, you cannot access this content` | Nada: usa el script de la [opción 🅰️](#-antes-de-empezar). Tu cuenta no puede copiar plantillas de fuera de la empresa |
 | `actions/checkout@v7 is not allowed to be used in...` | Que agregue `actions/*` a las acciones permitidas |
 | `must be pinned to a full length commit SHA` | Nada: usa el SHA completo. Es buena práctica |
 | `Actions is disabled for this repository` | Que habilite Actions en el repo, la org o la empresa |
@@ -1445,12 +1513,34 @@ Gracias.
 - [ ] **Haz una prueba real del Módulo 5** en un repo privado de la organización:
       te toma 2 minutos y es el único paso que depende de licencias
 
+**Deja la plantilla dentro de la empresa (5 minutos, una sola vez):**
+
+Si tu empresa usa **Enterprise Managed Users**, los participantes **no pueden**
+usar «Use this template» contra un repositorio público de fuera. Déjales la
+plantilla dentro y les devuelves el comando de una línea:
+
+```bash
+# 1. Trae el contenido a tu organización
+bash scripts/crear-mi-repo.sh MI-ORG taller-workflows-plantilla internal
+
+# 2. Márcalo como plantilla
+gh api -X PATCH repos/MI-ORG/taller-workflows-plantilla -F is_template=true
+```
+
+Usa **`internal`**: así todo el mundo en la empresa puede leerlo sin que tengas
+que dar permisos uno por uno. Después, cada participante ejecuta:
+
+```bash
+gh repo create MI-ORG/taller-workflows-SU-USUARIO \
+  --template MI-ORG/taller-workflows-plantilla --private --clone
+```
+
 **Con los participantes, días antes:**
 
 - [ ] SDK de .NET 10, Git y GitHub CLI instalados
 - [ ] `gh auth login` hecho, y `gh api user/orgs` mostrando la organización
 - [ ] Copilot funcionando en su editor
-- [ ] **Su repositorio ya creado** desde la plantilla
+- [ ] **Su repositorio ya creado**, con el script o desde tu plantilla
 
 > [!IMPORTANT]
 > La hora del taller **asume que «Antes de empezar» ya está hecho**. Si la gente
