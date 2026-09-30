@@ -9,23 +9,16 @@ labels: error
 
 ## Qué esperaba que pasara
 
-## Cómo reproducirlo
-
-1.
-2.
-3.
-
-## Ejercicio y entorno
+## Dónde
 
 - Módulo:
 - Sistema operativo: Windows / macOS / Linux
-- Versión del SDK (`dotnet --version`):
 - Enlace a la ejecución de Actions:
 
 ## ¿Puede ser una política de la organización?
 
-<!-- Si el error dice "is not allowed", "disabled" o el job nunca arranca,
-     revisa la sección "Cuando la política de la organización te bloquea". -->
+<!-- Si el error dice "not allowed" o "disabled", o el job nunca arranca,
+     revisa la sección "Políticas de tu organización" del README. -->
 
 - [ ] El mensaje menciona `not allowed` o `disabled`
 - [ ] `gh api repos/MI-ORG/MI-REPO/actions/permissions` devuelve algo distinto de `"all"`
