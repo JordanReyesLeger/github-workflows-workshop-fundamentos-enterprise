@@ -686,7 +686,20 @@ pipeline en rojo**.
 > Team y Enterprise Cloud. No necesitas hacer público nada, y te basta con ser
 > administrador de **tu** repositorio, cosa que ya eres por haberlo creado.
 
-### 🔧 Paso 1 · Crea el ruleset
+### 🔧 Paso 1 · Crea la regla
+
+**En 4 pasos:**
+
+1. Abre **Settings → Rules → Rulesets** (o **Branches**, según la interfaz del repositorio).
+2. Crea una regla que apunte a la rama `main`.
+3. Activa **Require a pull request before merging** y **Require status checks to pass**.
+4. En la lista de checks, selecciona **Construir y probar** y guarda la regla.
+
+Y lo más importante: **que nadie pueda subir directo a `main`, ni siquiera tú.**
+Como creaste el repositorio, eres administrador, y un administrador puede
+saltarse las reglas si se lo permites.
+
+#### 🅰️ Con Rulesets (recomendado)
 
 **Settings → Rules → Rulesets → New ruleset → New branch ruleset**
 
@@ -694,7 +707,8 @@ pipeline en rojo**.
 |-------|-------|
 | **Ruleset Name** | `Proteger main` |
 | **Enforcement status** | `Active` ⚠️ en *Evaluate* no bloquea nada |
-| **Target branches** | **Include default branch** |
+| **Bypass list** | 🚫 **Déjala vacía**: así nadie se salta la regla, ni los administradores |
+| **Target branches** | **Add target → Include default branch** (es `main`) |
 
 Marca estas reglas:
 
@@ -702,13 +716,33 @@ Marca estas reglas:
 |---|-----------|
 | **Restrict deletions** | Nadie borra `main` |
 | **Block force pushes** | Nadie reescribe la historia |
-| **Require a pull request before merging** | Todo cambio pasa por un PR |
+| **Require a pull request before merging** | Todo cambio pasa por un PR: **nadie sube directo a `main`** |
 | └ *Required approvals:* `0` | En el taller trabajas solo |
-| **Require status checks to pass** | 👉 añade el check **`Construir y probar`** |
+| **Require status checks to pass** | Pulsa **Add checks** 👉 elige **`Construir y probar`** |
+| └ ☑️ *Require branches to be up to date before merging* | El PR se prueba contra la última versión de `main` |
+
+Pulsa **Create**.
+
+#### 🅱️ Con Branches (interfaz clásica)
+
+Si tu repositorio muestra **Settings → Branches → Add branch protection rule**
+(o **Add classic branch protection rule**):
+
+| Campo | Valor |
+|-------|-------|
+| **Branch name pattern** | `main` |
+| ☑️ **Require a pull request before merging** | *Require approvals* desmarcado (trabajas solo) |
+| ☑️ **Require status checks to pass before merging** | Busca y elige **`Construir y probar`** |
+| └ ☑️ *Require branches to be up to date before merging* | Igual que arriba |
+| ☑️ **Do not allow bypassing the above settings** | 🚫 **Imprescindible**: sin esto, tú como admin **sí puedes** subir directo a `main` |
+
+Pulsa **Create**. En *Allow force pushes* y *Allow deletions* no marques nada.
 
 > [!IMPORTANT]
-> En la lista aparece el **`name:` del job**, no el del workflow. Y solo aparece
-> si **ya se ejecutó una vez**. Si no lo encuentras, es que aún no ha corrido.
+> En la lista de checks aparece el **`name:` del job** (`Construir y probar`),
+> no el del workflow. Y solo aparece si **ya se ejecutó una vez** en el
+> repositorio. Si no lo encuentras, es que aún no ha corrido: haz un push a una
+> rama, deja que termine el CI y vuelve.
 
 <details>
 <summary>💻 <b>¿Prefieres hacerlo por terminal?</b></summary>
@@ -717,9 +751,10 @@ Pídeselo a Copilot:
 
 ```text
 Dame el JSON para crear un ruleset de rama en GitHub vía API REST que:
-proteja la rama por defecto, esté activo, impida borrado y force push,
-exija pull request con 0 aprobaciones, y exija el status check
-"Construir y probar". Y dame el comando gh api para aplicarlo.
+proteja la rama por defecto, esté activo, no tenga lista de bypass,
+impida borrado y force push, exija pull request con 0 aprobaciones, y
+exija el status check "Construir y probar". Y dame el comando gh api
+para aplicarlo.
 ```
 
 El resultado debería parecerse a esto:
@@ -729,6 +764,7 @@ El resultado debería parecerse a esto:
   "name": "Proteger main",
   "target": "branch",
   "enforcement": "active",
+  "bypass_actors": [],
   "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
   "rules": [
     { "type": "deletion" },
@@ -752,7 +788,10 @@ gh api --method POST repos/MI-ORG/TU-REPO/rulesets --input ruleset.json
 
 </details>
 
-### ▶️ Paso 2 · Comprueba que bloquea
+### ▶️ Paso 2 · Comprueba que nadie sube directo a main
+
+Intenta hacer push directo a `main`. Recuerda que eres **administrador** del
+repositorio: si la regla te detiene a ti, detiene a todos.
 
 ```bash
 git switch main
@@ -761,9 +800,27 @@ git commit -am "test: push directo a main"
 git push
 ```
 
+Con **Rulesets** verás:
+
 ```text
-! [remote rejected] main -> main (protected branch hook declined)
+remote: error: GH013: Repository rule violations found for refs/heads/main.
+remote: - Changes must be made through a pull request.
+remote: - Required status check "Construir y probar" is expected.
+ ! [remote rejected] main -> main (push declined due to repository rule violations)
 ```
+
+Con **Branches** (interfaz clásica):
+
+```text
+remote: error: GH006: Protected branch update failed for refs/heads/main.
+ ! [remote rejected] main -> main (protected branch hook declined)
+```
+
+> [!WARNING]
+> Si en vez del rechazo ves **`Bypassed rule violations`** y el push **entra**,
+> la regla te dejó pasar por ser administrador. Arréglalo: en Rulesets, vacía la
+> **Bypass list**; en Branches, marca **Do not allow bypassing the above
+> settings**. Repite la prueba.
 
 🎉 Funciona. Deshazlo:
 
@@ -1499,7 +1556,7 @@ Gracias.
 ### 🛡️ Tu repositorio
 
 - [ ] Vive en tu organización y es privado o interno
-- [ ] `main` rechaza pushes directos
+- [ ] `main` rechaza pushes directos, **también los tuyos como administrador**
 - [ ] Un PR en rojo **no se puede mergear**
 - [ ] **Push protection activo**: probaste que rechaza un secreto
 - [ ] `CODEOWNERS` apunta a un equipo, no a una persona
